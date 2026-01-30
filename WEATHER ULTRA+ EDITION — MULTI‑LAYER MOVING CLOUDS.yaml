@@ -1,0 +1,161 @@
+type: weather-forecast
+entity: weather.tomorrow_io_home
+show_forecast: true
+
+card_mod:
+  style: |
+    {% set t = state_attr('weather.tomorrow_io_home','temperature') | float(0) %}
+    {% set cond = states('weather.tomorrow_io_home') %}
+    {% set pm25 = states('sensor.tomorrow_io_home_pm25') | float(0) %}
+    {% set aqi = states('sensor.tomorrow_io_home_aqi') | float(0) %}
+
+    ha-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      backdrop-filter: blur(22px) saturate(180%);
+      -webkit-backdrop-filter: blur(22px) saturate(180%);
+      transition: all 0.8s ease;
+    }
+
+    /* ==========================================================
+        1) BASE BACKGROUND (TEMP + PM2.5 + FOG)
+       ========================================================== */
+    ha-card {
+      background:
+        {% if pm25 > 150 %}
+          linear-gradient(135deg, rgba(255,130,0,0.45), rgba(120,60,0,0.55));
+        {% elif cond == 'fog' %}
+          linear-gradient(145deg, rgba(255,255,255,0.58), rgba(180,180,180,0.75));
+        {% elif t <= 24 %}
+          linear-gradient(135deg, #6ec6ffcc, #1e88e5cc);
+        {% elif t <= 30 %}
+          linear-gradient(135deg, #ffe066cc, #ffb703cc);
+        {% elif t <= 35 %}
+          linear-gradient(135deg, #ff7c43cc, #f15b2acc);
+        {% else %}
+          linear-gradient(135deg, #ff4d4dcc, #c9184acc);
+        {% endif %};
+    }
+
+    /* ==========================================================
+        2) MULTI-LAYER MOVING CLOUDS (ULTRA+ EDITION)
+       ========================================================== */
+
+    /* ---------- Layer 1: บาง เคลื่อนช้า ซ้าย→ขวา ---------- */
+    ha-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        {% if cond in ['cloudy','partlycloudy','rainy','lightning','lightning-rainy','fog'] %}
+          url("https://i.imgur.com/7i1Cw1x.png") repeat;
+        {% else %} none {% endif %};
+      opacity:
+        {% if cond == 'fog' %} 0.55
+        {% elif cond in ['cloudy','partlycloudy'] %} 0.30
+        {% elif cond in ['rainy'] %} 0.25
+        {% elif cond in ['lightning','lightning-rainy'] %} 0.20
+        {% else %} 0 {% endif %};
+      animation:
+        {% if cond == 'fog' %} cloudLayer1 120s linear infinite;
+        {% elif cond in ['cloudy','partlycloudy'] %} cloudLayer1 70s linear infinite;
+        {% elif cond == 'rainy' %} cloudLayer1 50s linear infinite;
+        {% elif cond in ['lightning','lightning-rainy'] %} cloudLayer1 40s linear infinite;
+        {% else %} none {% endif %};
+      z-index: 0;
+      filter: blur(20px);
+      pointer-events: none;
+    }
+
+    @keyframes cloudLayer1 {
+      0%   { background-position: 0px 0px; }
+      100% { background-position: 1000px 400px; }
+    }
+
+    /* ---------- Layer 2: หนากว่า เคลื่อนเร็วกว่า ขวา→ซ้าย ---------- */
+    ha-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        {% if cond in ['cloudy','partlycloudy','rainy','lightning','lightning-rainy','fog'] %}
+          url("https://i.imgur.com/VxJv0Qb.png") repeat;
+        {% else %} none {% endif %};
+      opacity:
+        {% if cond == 'fog' %} 0.45
+        {% elif cond in ['cloudy','partlycloudy'] %} 0.22
+        {% elif cond == 'rainy' %} 0.18
+        {% elif cond in ['lightning','lightning-rainy'] %} 0.15
+        {% else %} 0 {% endif %};
+      animation:
+        {% if cond == 'fog' %} cloudLayer2 150s linear infinite;
+        {% elif cond in ['cloudy','partlycloudy'] %} cloudLayer2 90s linear infinite;
+        {% elif cond == 'rainy' %} cloudLayer2 65s linear infinite;
+        {% elif cond in ['lightning','lightning-rainy'] %} cloudLayer2 50s linear infinite;
+        {% else %} none {% endif %};
+      z-index: 1;
+      filter: blur(30px);
+      pointer-events: none;
+      mix-blend-mode: soft-light;
+    }
+
+    @keyframes cloudLayer2 {
+      0%   { background-position: 0px 0px; }
+      100% { background-position: -1800px 600px; }
+    }
+
+    /* ==========================================================
+        3) 3D TOP HIGHLIGHT (VISIONOS)
+       ========================================================== */
+    .content {
+      position: relative;
+      z-index: 10;
+    }
+
+    ha-card .content::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 25%, rgba(255,255,255,0.28), transparent 60%),
+        radial-gradient(circle at 85% 75%, rgba(255,255,255,0.18), transparent 70%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ==========================================================
+        4) WEATHER ANIMATIONS (SUNNY / STORM)
+       ========================================================== */
+
+    /* ☀ Sunny → Glow */
+    {% if cond in ['sunny','clear'] %}
+      ha-card {
+        animation: sunnyGlowUltra 4s ease-in-out infinite;
+      }
+      @keyframes sunnyGlowUltra {
+        0%   { box-shadow: 0 0 28px rgba(255,255,200,0.25); }
+        50%  { box-shadow: 0 0 55px rgba(255,255,240,0.55); }
+        100% { box-shadow: 0 0 28px rgba(255,255,200,0.25); }
+      }
+    {% endif %}
+
+    /* ⛈ Storm → Pulse */
+    {% if cond in ['lightning','lightning-rainy','thunderstorm','hail'] %}
+      ha-card {
+        animation: stormPulseUltra 1.15s ease-in-out infinite;
+      }
+      @keyframes stormPulseUltra {
+        0%   { transform: scale(1); }
+        35%  { transform: scale(1.035); }
+        70%  { transform: scale(0.985); }
+        100% { transform: scale(1); }
+      }
+    {% endif %}
+
+    :host {
+      --card-mod-icon-color: #ffffff;
+    }
